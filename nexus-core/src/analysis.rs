@@ -214,7 +214,7 @@ fn find_cross_cluster_bridges(
 fn suggest_connections(
     graph: &KnowledgeGraph,
     metrics: &GraphMetrics,
-    cluster_map: &HashMap<String, String>,
+    _cluster_map: &HashMap<String, String>,
 ) -> Vec<SuggestedConnection> {
     let mut suggestions = Vec::new();
 
