@@ -1,0 +1,3 @@
+[workspace]
+members = ["nexus-core", "nexus-cli"]
+resolver = "2"
