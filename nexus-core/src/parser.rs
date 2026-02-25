@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+static TAG_RE: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"(?:^|[\s,(])#([a-zA-Z][a-zA-Z0-9_/-]*)").unwrap());
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
@@ -91,8 +95,6 @@ pub fn extract_tags(content: &str) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut in_code_block = false;
 
-    let tag_re = regex::Regex::new(r"(?:^|[\s,(])#([a-zA-Z][a-zA-Z0-9_/-]*)").unwrap();
-
     for line in content.lines() {
         let trimmed = line.trim_start();
         if trimmed.starts_with("```") {
@@ -107,7 +109,7 @@ pub fn extract_tags(content: &str) -> Vec<String> {
             continue;
         }
 
-        for cap in tag_re.captures_iter(line) {
+        for cap in TAG_RE.captures_iter(line) {
             let tag = cap[1].to_lowercase();
             if seen.insert(tag.clone()) {
                 tags.push(tag);

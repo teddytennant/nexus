@@ -103,17 +103,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Tab => app.next_tab(),
                     KeyCode::BackTab => app.prev_tab(),
                     KeyCode::Char('j') | KeyCode::Down => {
-                        if app.scroll_offset < app.max_scroll() {
+                        if app.scroll_offset() < app.max_scroll() {
                             app.scroll_down();
                         }
                     }
                     KeyCode::Char('k') | KeyCode::Up => app.scroll_up(),
-                    KeyCode::Char('1') => { app.active_tab = app::Tab::Overview; app.scroll_offset = 0; }
-                    KeyCode::Char('2') => { app.active_tab = app::Tab::Graph; app.scroll_offset = 0; }
-                    KeyCode::Char('3') => { app.active_tab = app::Tab::Clusters; app.scroll_offset = 0; }
-                    KeyCode::Char('4') => { app.active_tab = app::Tab::Bridges; app.scroll_offset = 0; }
-                    KeyCode::Char('5') => { app.active_tab = app::Tab::Pulse; app.scroll_offset = 0; }
-                    KeyCode::Char('6') => { app.active_tab = app::Tab::Suggestions; app.scroll_offset = 0; }
+                    KeyCode::Char('1') => app.active_tab = app::Tab::Overview,
+                    KeyCode::Char('2') => app.active_tab = app::Tab::Graph,
+                    KeyCode::Char('3') => app.active_tab = app::Tab::Clusters,
+                    KeyCode::Char('4') => app.active_tab = app::Tab::Bridges,
+                    KeyCode::Char('5') => app.active_tab = app::Tab::Pulse,
+                    KeyCode::Char('6') => app.active_tab = app::Tab::Suggestions,
                     _ => {}
                 }
             }

@@ -51,8 +51,7 @@ pub struct App {
     pub active_tab: Tab,
     pub analysis: Analysis,
     pub repos: Vec<GitRepoStats>,
-    pub scroll_offset: usize,
-    pub should_quit: bool,
+    pub scroll_offsets: [usize; 6],
 }
 
 impl App {
@@ -61,27 +60,34 @@ impl App {
             active_tab: Tab::Overview,
             analysis,
             repos,
-            scroll_offset: 0,
-            should_quit: false,
+            scroll_offsets: [0; 6],
         }
+    }
+
+    fn tab_index(&self) -> usize {
+        Tab::ALL.iter().position(|t| *t == self.active_tab).unwrap_or(0)
+    }
+
+    pub fn scroll_offset(&self) -> usize {
+        self.scroll_offsets[self.tab_index()]
     }
 
     pub fn next_tab(&mut self) {
         self.active_tab = self.active_tab.next();
-        self.scroll_offset = 0;
     }
 
     pub fn prev_tab(&mut self) {
         self.active_tab = self.active_tab.prev();
-        self.scroll_offset = 0;
     }
 
     pub fn scroll_down(&mut self) {
-        self.scroll_offset = self.scroll_offset.saturating_add(1);
+        let idx = self.tab_index();
+        self.scroll_offsets[idx] = self.scroll_offsets[idx].saturating_add(1);
     }
 
     pub fn scroll_up(&mut self) {
-        self.scroll_offset = self.scroll_offset.saturating_sub(1);
+        let idx = self.tab_index();
+        self.scroll_offsets[idx] = self.scroll_offsets[idx].saturating_sub(1);
     }
 
     pub fn max_scroll(&self) -> usize {

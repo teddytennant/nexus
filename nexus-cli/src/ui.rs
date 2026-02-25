@@ -210,7 +210,7 @@ fn draw_graph(frame: &mut Frame, app: &App, area: Rect) {
     // For the full graph table, re-collect from vault_health
     let rows: Vec<Row> = all_notes
         .iter()
-        .skip(app.scroll_offset)
+        .skip(app.scroll_offset())
         .map(|n| {
             Row::new(vec![
                 Cell::from(n.id.clone()).style(Style::default().fg(CYAN)),
@@ -256,7 +256,7 @@ fn draw_clusters(frame: &mut Frame, app: &App, area: Rect) {
         .analysis
         .cluster_summary
         .iter()
-        .skip(app.scroll_offset)
+        .skip(app.scroll_offset())
         .map(|c| {
             let density_color = if c.density > 0.5 {
                 GREEN
@@ -307,7 +307,7 @@ fn draw_bridges(frame: &mut Frame, app: &App, area: Rect) {
         .analysis
         .bridge_concepts
         .iter()
-        .skip(app.scroll_offset)
+        .skip(app.scroll_offset())
         .map(|b| {
             Row::new(vec![
                 Cell::from(b.id.clone()).style(Style::default().fg(GREEN).add_modifier(Modifier::BOLD)),
@@ -351,7 +351,7 @@ fn draw_pulse(frame: &mut Frame, app: &App, area: Rect) {
     let rows: Vec<Row> = app
         .repos
         .iter()
-        .skip(app.scroll_offset)
+        .skip(app.scroll_offset())
         .map(|r| {
             let activity_color = if r.commit_count_30d > 10 {
                 GREEN
