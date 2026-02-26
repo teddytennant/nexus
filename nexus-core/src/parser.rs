@@ -104,9 +104,12 @@ pub fn extract_tags(content: &str) -> Vec<String> {
         if in_code_block {
             continue;
         }
-        // Skip heading lines (# Heading)
-        if trimmed.starts_with("# ") || trimmed.starts_with("## ") || trimmed.starts_with("### ") {
-            continue;
+        // Skip heading lines (# Heading, ## Heading, etc.)
+        if trimmed.starts_with('#') {
+            let after_hashes = trimmed.trim_start_matches('#');
+            if after_hashes.starts_with(' ') || after_hashes.is_empty() {
+                continue;
+            }
         }
 
         for cap in TAG_RE.captures_iter(line) {
