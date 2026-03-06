@@ -86,7 +86,7 @@ pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> 
             cluster_label: cluster_map.get(id).cloned().unwrap_or_default(),
         })
         .collect();
-    hub_notes.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    hub_notes.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     hub_notes.truncate(top_n);
 
     // AC7.2: Bridge Concepts — top N by betweenness centrality
@@ -101,7 +101,7 @@ pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> 
             cluster_label: cluster_map.get(id).cloned().unwrap_or_default(),
         })
         .collect();
-    bridge_concepts.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    bridge_concepts.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     bridge_concepts.truncate(top_n);
 
     // AC7.3: Orphan Notes — 0 incoming links (only real notes, not phantoms)
@@ -126,7 +126,7 @@ pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> 
                 .iter()
                 .map(|m| (m.clone(), *metrics.pagerank.get(m).unwrap_or(&0.0)))
                 .collect();
-            top_members.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            top_members.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             let top: Vec<String> = top_members.iter().take(5).map(|(id, _)| id.clone()).collect();
 
             ClusterSummary {
@@ -207,7 +207,7 @@ fn find_cross_cluster_bridges(
         }
     }
 
-    bridges.sort_by(|a, b| b.betweenness.partial_cmp(&a.betweenness).unwrap());
+    bridges.sort_by(|a, b| b.betweenness.partial_cmp(&a.betweenness).unwrap_or(std::cmp::Ordering::Equal));
     bridges
 }
 
@@ -516,5 +516,19 @@ mod tests {
         );
         assert!(analysis.hub_notes.len() <= 2);
         assert!(analysis.bridge_concepts.len() <= 2);
+    }
+
+    #[test]
+    fn test_sorting_does_not_panic_with_equal_scores() {
+        let analysis = build_analysis(
+            vec![
+                make_note("a", &[], "test"),
+                make_note("b", &[], "test"),
+                make_note("c", &[], "test"),
+            ],
+            10,
+        );
+        assert_eq!(analysis.hub_notes.len(), 3);
+        assert_eq!(analysis.bridge_concepts.len(), 3);
     }
 }
