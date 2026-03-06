@@ -204,11 +204,7 @@ fn draw_graph(frame: &mut Frame, app: &App, area: Rect) {
         Cell::from("Cluster").style(Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
     ]);
 
-    // Sort all notes by pagerank
-    let all_notes: Vec<_> = app.analysis.hub_notes.clone();
-    // The hub_notes are already sorted by pagerank, but only top N
-    // For the full graph table, re-collect from vault_health
-    let rows: Vec<Row> = all_notes
+    let rows: Vec<Row> = app.analysis.all_notes
         .iter()
         .skip(app.scroll_offset())
         .map(|n| {
