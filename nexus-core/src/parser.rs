@@ -253,6 +253,13 @@ mod tests {
         assert_eq!(tags, vec!["real-tag"]);
     }
 
+    #[test]
+    fn test_tags_ignored_in_inline_code() {
+        let content = "Use `#not-a-tag` but #real-tag is real.";
+        let tags = extract_tags(content);
+        assert_eq!(tags, vec!["real-tag"]);
+    }
+
     // === AC1.5: Handles files with no links gracefully ===
     #[test]
     fn test_note_with_no_links() {
