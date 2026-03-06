@@ -93,7 +93,7 @@ impl App {
     pub fn max_scroll(&self) -> usize {
         match self.active_tab {
             Tab::Overview => 0,
-            Tab::Graph => self.analysis.hub_notes.len().saturating_sub(1),
+            Tab::Graph => self.analysis.all_notes.len().saturating_sub(1),
             Tab::Clusters => self.analysis.cluster_summary.len().saturating_sub(1),
             Tab::Bridges => self.analysis.bridge_concepts.len().saturating_sub(1),
             Tab::Pulse => self.repos.len().saturating_sub(1),
