@@ -109,12 +109,13 @@ pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> 
     bridge_concepts.truncate(top_n);
 
     // AC7.3: Orphan Notes — 0 incoming links (only real notes, not phantoms)
-    let orphan_notes: Vec<String> = graph
+    let mut orphan_notes: Vec<String> = graph
         .notes
         .keys()
         .filter(|id| graph.in_degree(id) == 0)
         .cloned()
         .collect();
+    orphan_notes.sort();
 
     // AC7.4: Phantom Notes — referenced but no file
     let mut phantom_notes: Vec<String> = graph.phantom_nodes.iter().cloned().collect();
