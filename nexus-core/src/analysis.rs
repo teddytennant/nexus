@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 pub struct Analysis {
     pub hub_notes: Vec<RankedNote>,
     pub bridge_concepts: Vec<RankedNote>,
+    pub all_notes: Vec<RankedNote>,
     pub orphan_notes: Vec<String>,
     pub phantom_notes: Vec<String>,
     pub cluster_summary: Vec<ClusterSummary>,
@@ -74,8 +75,8 @@ fn build_cluster_map(clusters: &[Cluster]) -> HashMap<String, String> {
 pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> Analysis {
     let cluster_map = build_cluster_map(&metrics.clusters);
 
-    // AC7.1: Hub Notes — top N by PageRank
-    let mut hub_notes: Vec<RankedNote> = metrics
+    // All notes sorted by PageRank (used by Graph tab)
+    let mut all_notes: Vec<RankedNote> = metrics
         .pagerank
         .iter()
         .map(|(id, score)| RankedNote {
@@ -86,7 +87,10 @@ pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> 
             cluster_label: cluster_map.get(id).cloned().unwrap_or_default(),
         })
         .collect();
-    hub_notes.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    all_notes.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+    // AC7.1: Hub Notes — top N by PageRank
+    let mut hub_notes = all_notes.clone();
     hub_notes.truncate(top_n);
 
     // AC7.2: Bridge Concepts — top N by betweenness centrality
@@ -151,6 +155,7 @@ pub fn analyze(graph: &KnowledgeGraph, metrics: &GraphMetrics, top_n: usize) -> 
     Analysis {
         hub_notes,
         bridge_concepts,
+        all_notes,
         orphan_notes,
         phantom_notes,
         cluster_summary,
@@ -516,6 +521,8 @@ mod tests {
         );
         assert!(analysis.hub_notes.len() <= 2);
         assert!(analysis.bridge_concepts.len() <= 2);
+        // all_notes should still contain every node (5 real + 0 phantoms in graph)
+        assert!(analysis.all_notes.len() > 2);
     }
 
     #[test]
