@@ -150,7 +150,8 @@ pub fn betweenness_centrality(graph: &KnowledgeGraph) -> HashMap<String, f64> {
 ///
 /// Treats the graph as undirected for community detection.
 pub fn label_propagation(graph: &KnowledgeGraph, pagerank_scores: &HashMap<String, f64>) -> Vec<Cluster> {
-    let nodes: Vec<String> = graph.all_node_ids().into_iter().collect();
+    let mut nodes: Vec<String> = graph.all_node_ids().into_iter().collect();
+    nodes.sort();
     if nodes.is_empty() {
         return vec![];
     }
