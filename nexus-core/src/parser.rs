@@ -89,6 +89,23 @@ pub fn extract_wikilinks(content: &str) -> Vec<String> {
     links
 }
 
+/// Strip inline code spans (backtick-delimited) from a line, replacing them with spaces.
+fn strip_inline_code(line: &str) -> String {
+    let mut result = String::with_capacity(line.len());
+    let mut in_code = false;
+    for ch in line.chars() {
+        if ch == '`' {
+            in_code = !in_code;
+            result.push(' ');
+        } else if in_code {
+            result.push(' ');
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
 /// Extract #tags from markdown content, ignoring those inside code blocks and headings.
 pub fn extract_tags(content: &str) -> Vec<String> {
     let mut tags = Vec::new();
@@ -112,7 +129,9 @@ pub fn extract_tags(content: &str) -> Vec<String> {
             }
         }
 
-        for cap in TAG_RE.captures_iter(line) {
+        // Strip inline code spans before searching for tags
+        let stripped = strip_inline_code(line);
+        for cap in TAG_RE.captures_iter(&stripped) {
             let tag = cap[1].to_lowercase();
             if seen.insert(tag.clone()) {
                 tags.push(tag);
@@ -256,6 +275,14 @@ mod tests {
     #[test]
     fn test_tags_ignored_in_inline_code() {
         let content = "Use `#not-a-tag` but #real-tag is real.";
+        let tags = extract_tags(content);
+        assert_eq!(tags, vec!["real-tag"]);
+    }
+
+    #[test]
+    fn test_tags_ignored_in_inline_code_with_preceding_space() {
+        // Tag inside backticks preceded by space should still be ignored
+        let content = "Use `some text #not-a-tag` but #real-tag is real.";
         let tags = extract_tags(content);
         assert_eq!(tags, vec!["real-tag"]);
     }
