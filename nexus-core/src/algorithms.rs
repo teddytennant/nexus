@@ -76,61 +76,87 @@ pub fn pagerank(graph: &KnowledgeGraph, damping: f64, max_iter: usize, tolerance
 
 /// Compute betweenness centrality using Brandes' algorithm.
 ///
-/// Normalized to [0.0, 1.0] range.
+/// Normalized to [0.0, 1.0] range. Uses index-based vectors instead of
+/// per-iteration HashMaps for better performance on large graphs.
 pub fn betweenness_centrality(graph: &KnowledgeGraph) -> HashMap<String, f64> {
     let nodes: Vec<String> = graph.all_node_ids().into_iter().collect();
     let n = nodes.len();
-    let mut centrality: HashMap<String, f64> = nodes.iter().map(|id| (id.clone(), 0.0)).collect();
 
     if n <= 2 {
-        return centrality;
+        return nodes.iter().map(|id| (id.clone(), 0.0)).collect();
     }
 
-    for s in &nodes {
-        // BFS from s
-        let mut stack: Vec<String> = Vec::new();
-        let mut predecessors: HashMap<String, Vec<String>> = HashMap::new();
-        let mut sigma: HashMap<String, f64> = nodes.iter().map(|id| (id.clone(), 0.0)).collect();
-        let mut dist: HashMap<String, i64> = nodes.iter().map(|id| (id.clone(), -1)).collect();
+    // Map node IDs to indices for fast lookup
+    let node_index: HashMap<&String, usize> = nodes.iter().enumerate().map(|(i, id)| (id, i)).collect();
 
-        sigma.insert(s.clone(), 1.0);
-        dist.insert(s.clone(), 0);
+    // Build index-based adjacency list
+    let adj: Vec<Vec<usize>> = nodes
+        .iter()
+        .map(|id| {
+            graph
+                .adjacency
+                .get(id)
+                .map(|targets| {
+                    targets
+                        .iter()
+                        .filter_map(|t| node_index.get(t).copied())
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+        .collect();
 
-        let mut queue: VecDeque<String> = VecDeque::new();
-        queue.push_back(s.clone());
+    let mut centrality = vec![0.0_f64; n];
+
+    // Reusable buffers (allocated once, cleared each iteration)
+    let mut stack: Vec<usize> = Vec::with_capacity(n);
+    let mut predecessors: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut sigma = vec![0.0_f64; n];
+    let mut dist = vec![-1_i64; n];
+    let mut delta = vec![0.0_f64; n];
+    let mut queue: VecDeque<usize> = VecDeque::with_capacity(n);
+
+    for s in 0..n {
+        // Reset buffers
+        stack.clear();
+        for pred in &mut predecessors {
+            pred.clear();
+        }
+        sigma.fill(0.0);
+        dist.fill(-1);
+        delta.fill(0.0);
+        queue.clear();
+
+        sigma[s] = 1.0;
+        dist[s] = 0;
+        queue.push_back(s);
 
         while let Some(v) = queue.pop_front() {
-            stack.push(v.clone());
-            let v_dist = dist[&v];
+            stack.push(v);
+            let v_dist = dist[v];
 
-            if let Some(neighbors) = graph.adjacency.get(&v) {
-                for w in neighbors {
-                    // First visit?
-                    if dist[w] < 0 {
-                        dist.insert(w.clone(), v_dist + 1);
-                        queue.push_back(w.clone());
-                    }
-                    // Shortest path via v?
-                    if dist[w] == v_dist + 1 {
-                        sigma.insert(w.clone(), sigma[w] + sigma[&v]);
-                        predecessors.entry(w.clone()).or_default().push(v.clone());
-                    }
+            for &w in &adj[v] {
+                // First visit?
+                if dist[w] < 0 {
+                    dist[w] = v_dist + 1;
+                    queue.push_back(w);
+                }
+                // Shortest path via v?
+                if dist[w] == v_dist + 1 {
+                    sigma[w] += sigma[v];
+                    predecessors[w].push(v);
                 }
             }
         }
 
         // Accumulate
-        let mut delta: HashMap<String, f64> = nodes.iter().map(|id| (id.clone(), 0.0)).collect();
-
         while let Some(w) = stack.pop() {
-            if let Some(preds) = predecessors.get(&w) {
-                for v in preds {
-                    let d = (sigma[v] / sigma[&w]) * (1.0 + delta[&w]);
-                    *delta.get_mut(v).unwrap() += d;
-                }
+            for &v in &predecessors[w] {
+                let d = (sigma[v] / sigma[w]) * (1.0 + delta[w]);
+                delta[v] += d;
             }
-            if &w != s {
-                *centrality.get_mut(&w).unwrap() += delta[&w];
+            if w != s {
+                centrality[w] += delta[w];
             }
         }
     }
@@ -138,12 +164,16 @@ pub fn betweenness_centrality(graph: &KnowledgeGraph) -> HashMap<String, f64> {
     // Normalize: divide by (n-1)(n-2) for directed graphs
     let norm = ((n - 1) * (n - 2)) as f64;
     if norm > 0.0 {
-        for val in centrality.values_mut() {
+        for val in &mut centrality {
             *val /= norm;
         }
     }
 
-    centrality
+    nodes
+        .into_iter()
+        .enumerate()
+        .map(|(i, id)| (id, centrality[i]))
+        .collect()
 }
 
 /// Detect communities using label propagation algorithm.

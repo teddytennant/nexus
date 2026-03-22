@@ -195,7 +195,7 @@ pub fn parse_vault(vault_path: &Path) -> std::io::Result<Vec<Note>> {
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "md") {
+        if path.extension() == Some(std::ffi::OsStr::new("md")) {
             match parse_note(path) {
                 Ok(note) => notes.push(note),
                 Err(_) => continue,
