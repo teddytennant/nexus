@@ -197,43 +197,54 @@ pub fn betweenness_centrality(graph: &KnowledgeGraph) -> HashMap<String, f64> {
 /// Detect communities using label propagation algorithm.
 ///
 /// Treats the graph as undirected for community detection.
+/// Uses index-based vectors instead of HashMaps for better performance on large graphs.
 pub fn label_propagation(graph: &KnowledgeGraph, pagerank_scores: &HashMap<String, f64>) -> Vec<Cluster> {
     let mut nodes: Vec<String> = graph.all_node_ids().into_iter().collect();
     nodes.sort();
-    if nodes.is_empty() {
+    let n = nodes.len();
+    if n == 0 {
         return vec![];
     }
 
-    // Build undirected adjacency
-    let mut undirected: HashMap<String, HashSet<String>> = HashMap::new();
+    // Map node IDs to indices
+    let node_index: HashMap<&String, usize> = nodes.iter().enumerate().map(|(i, id)| (id, i)).collect();
+
+    // Build undirected adjacency as index-based vectors
+    let mut undirected: Vec<Vec<usize>> = vec![vec![]; n];
     for (src, targets) in &graph.adjacency {
-        for tgt in targets {
-            undirected.entry(src.clone()).or_default().insert(tgt.clone());
-            undirected.entry(tgt.clone()).or_default().insert(src.clone());
+        if let Some(&si) = node_index.get(src) {
+            for tgt in targets {
+                if let Some(&ti) = node_index.get(tgt) {
+                    undirected[si].push(ti);
+                    undirected[ti].push(si);
+                }
+            }
         }
+    }
+    // Deduplicate neighbor lists (edges may appear in both directions)
+    for neighbors in &mut undirected {
+        neighbors.sort_unstable();
+        neighbors.dedup();
     }
 
     // Initialize: each node is its own label
-    let mut labels: HashMap<String, usize> = HashMap::new();
-    for (i, node) in nodes.iter().enumerate() {
-        labels.insert(node.clone(), i);
-    }
+    let mut labels: Vec<usize> = (0..n).collect();
 
     // Iterate
     let max_iter = 50;
     for _ in 0..max_iter {
         let mut changed = false;
 
-        for node in &nodes {
-            let neighbors = match undirected.get(node) {
-                Some(n) if !n.is_empty() => n,
-                _ => continue,
-            };
+        for i in 0..n {
+            let neighbors = &undirected[i];
+            if neighbors.is_empty() {
+                continue;
+            }
 
             // Count neighbor labels
             let mut label_counts: HashMap<usize, usize> = HashMap::new();
-            for neighbor in neighbors {
-                *label_counts.entry(labels[neighbor]).or_insert(0) += 1;
+            for &ni in neighbors {
+                *label_counts.entry(labels[ni]).or_insert(0) += 1;
             }
 
             // Find max count
@@ -246,8 +257,8 @@ pub fn label_propagation(graph: &KnowledgeGraph, pagerank_scores: &HashMap<Strin
 
             // Pick smallest label among ties (deterministic)
             let best = *candidates.iter().min().unwrap();
-            if labels[node] != best {
-                labels.insert(node.clone(), best);
+            if labels[i] != best {
+                labels[i] = best;
                 changed = true;
             }
         }
@@ -259,8 +270,8 @@ pub fn label_propagation(graph: &KnowledgeGraph, pagerank_scores: &HashMap<Strin
 
     // Group by label
     let mut groups: HashMap<usize, Vec<String>> = HashMap::new();
-    for (node, label) in &labels {
-        groups.entry(*label).or_default().push(node.clone());
+    for (i, &label) in labels.iter().enumerate() {
+        groups.entry(label).or_default().push(nodes[i].clone());
     }
 
     // Build clusters
