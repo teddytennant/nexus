@@ -18,10 +18,36 @@ pub struct Note {
 }
 
 /// Normalize a string to a lowercase kebab-case ID.
+///
+/// Strips special characters (keeping only alphanumeric, hyphens, underscores, and slashes),
+/// collapses consecutive hyphens, and trims leading/trailing hyphens.
 pub fn normalize_id(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace(' ', "-")
+    let lowered = s.trim().to_lowercase();
+    let mut result = String::with_capacity(lowered.len());
+    for ch in lowered.chars() {
+        if ch.is_alphanumeric() || ch == '_' || ch == '/' {
+            result.push(ch);
+        } else {
+            // Replace spaces, apostrophes, parentheses, etc. with hyphens
+            result.push('-');
+        }
+    }
+    // Collapse consecutive hyphens
+    let mut collapsed = String::with_capacity(result.len());
+    let mut prev_hyphen = false;
+    for ch in result.chars() {
+        if ch == '-' {
+            if !prev_hyphen {
+                collapsed.push('-');
+            }
+            prev_hyphen = true;
+        } else {
+            collapsed.push(ch);
+            prev_hyphen = false;
+        }
+    }
+    // Trim leading/trailing hyphens
+    collapsed.trim_matches('-').to_string()
 }
 
 /// Extract wikilinks from markdown content, ignoring those inside code blocks.
@@ -188,10 +214,26 @@ pub fn parse_note(path: &Path) -> std::io::Result<Note> {
 }
 
 /// Parse all markdown files in a vault directory.
+///
+/// Skips `.obsidian/` and other hidden directories that contain Obsidian's
+/// internal configuration files.
 pub fn parse_vault(vault_path: &Path) -> std::io::Result<Vec<Note>> {
     let mut notes = Vec::new();
     for entry in walkdir::WalkDir::new(vault_path)
         .into_iter()
+        .filter_entry(|e| {
+            // Skip hidden directories (e.g. .obsidian, .trash, .git),
+            // but always allow the root vault directory through.
+            if !e.file_type().is_dir() {
+                return true;
+            }
+            if e.depth() == 0 {
+                return true;
+            }
+            !e.file_name()
+                .to_str()
+                .is_some_and(|name| name.starts_with('.'))
+        })
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
@@ -301,6 +343,13 @@ mod tests {
         assert_eq!(normalize_id("The Gradient"), "the-gradient");
         assert_eq!(normalize_id("AI Safety"), "ai-safety");
         assert_eq!(normalize_id("  spaces  "), "spaces");
+        // Special characters are stripped/replaced
+        assert_eq!(normalize_id("Plato's Republic"), "plato-s-republic");
+        assert_eq!(normalize_id("Note (draft)"), "note-draft");
+        assert_eq!(normalize_id("a & b"), "a-b");
+        assert_eq!(normalize_id("hello...world"), "hello-world");
+        // Slashes and underscores preserved
+        assert_eq!(normalize_id("folder/note_name"), "folder/note_name");
     }
 
     #[test]
@@ -369,5 +418,19 @@ mod tests {
         let notes = parse_vault(vault.path()).unwrap();
         let gradient = notes.iter().find(|n| n.id == "gradient").unwrap();
         assert_eq!(gradient.directory, "philosophy");
+    }
+
+    // === Hidden directories filtered ===
+    #[test]
+    fn test_parse_vault_skips_obsidian_dir() {
+        let vault = create_temp_vault(&[
+            ("note.md", "# Real Note"),
+            (".obsidian/plugins/plugin.md", "internal config"),
+            (".obsidian/workspace.md", "workspace data"),
+            (".trash/deleted.md", "deleted note"),
+        ]);
+        let notes = parse_vault(vault.path()).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id, "note");
     }
 }

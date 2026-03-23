@@ -23,6 +23,7 @@ pub struct GraphMetrics {
 ///
 /// Uses damping factor 0.85, converges when max delta < 1e-6 or after 100 iterations.
 /// Handles dangling nodes by distributing their rank uniformly.
+/// Uses index-based vectors instead of HashMaps for better performance on large graphs.
 pub fn pagerank(graph: &KnowledgeGraph, damping: f64, max_iter: usize, tolerance: f64) -> HashMap<String, f64> {
     let nodes: Vec<String> = graph.all_node_ids().into_iter().collect();
     let n = nodes.len();
@@ -30,48 +31,65 @@ pub fn pagerank(graph: &KnowledgeGraph, damping: f64, max_iter: usize, tolerance
         return HashMap::new();
     }
 
+    // Map node IDs to indices
+    let node_index: HashMap<&String, usize> = nodes.iter().enumerate().map(|(i, id)| (id, i)).collect();
+
+    // Precompute out-degrees and reverse adjacency as index-based vectors
+    let out_deg: Vec<usize> = nodes.iter().map(|id| graph.out_degree(id)).collect();
+    let rev_adj: Vec<Vec<usize>> = nodes
+        .iter()
+        .map(|id| {
+            graph
+                .reverse_adjacency
+                .get(id)
+                .map(|sources| {
+                    sources
+                        .iter()
+                        .filter_map(|s| node_index.get(s).copied())
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+        .collect();
+
+    // Precompute dangling node indices
+    let dangling: Vec<usize> = (0..n).filter(|&i| out_deg[i] == 0).collect();
+
     let initial = 1.0 / n as f64;
-    let mut rank: HashMap<String, f64> = nodes.iter().map(|id| (id.clone(), initial)).collect();
+    let mut rank = vec![initial; n];
+    let mut new_rank = vec![0.0_f64; n];
 
     for _ in 0..max_iter {
-        let mut new_rank: HashMap<String, f64> = HashMap::new();
-
-        // Compute dangling node contribution
-        let dangling_sum: f64 = nodes
-            .iter()
-            .filter(|id| graph.out_degree(id) == 0)
-            .map(|id| rank[id])
-            .sum();
-
+        let dangling_sum: f64 = dangling.iter().map(|&i| rank[i]).sum();
         let base = (1.0 - damping) / n as f64 + damping * dangling_sum / n as f64;
 
-        for node in &nodes {
+        for i in 0..n {
             let mut sum = 0.0;
-            if let Some(incoming) = graph.reverse_adjacency.get(node) {
-                for source in incoming {
-                    let out_deg = graph.out_degree(source);
-                    if out_deg > 0 {
-                        sum += rank[source] / out_deg as f64;
-                    }
+            for &src in &rev_adj[i] {
+                if out_deg[src] > 0 {
+                    sum += rank[src] / out_deg[src] as f64;
                 }
             }
-            new_rank.insert(node.clone(), base + damping * sum);
+            new_rank[i] = base + damping * sum;
         }
 
         // Check convergence
-        let max_delta: f64 = nodes
-            .iter()
-            .map(|id| (new_rank[id] - rank[id]).abs())
+        let max_delta: f64 = (0..n)
+            .map(|i| (new_rank[i] - rank[i]).abs())
             .fold(0.0_f64, f64::max);
 
-        rank = new_rank;
+        std::mem::swap(&mut rank, &mut new_rank);
 
         if max_delta < tolerance {
             break;
         }
     }
 
-    rank
+    nodes
+        .into_iter()
+        .enumerate()
+        .map(|(i, id)| (id, rank[i]))
+        .collect()
 }
 
 /// Compute betweenness centrality using Brandes' algorithm.
